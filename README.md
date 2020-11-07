@@ -52,6 +52,11 @@ AppDynamics extension to pull data from ThousandEyes tests and import them into 
       ```
         sudo apt install python3
       ```
+    - Modify startup script to use the python3 installation
+      ```
+        vi appdte.sh
+      ```
+        change python to python3
     - Run the bash Script (Tes)
       ```
         sudo apt install python3
