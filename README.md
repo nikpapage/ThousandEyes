@@ -66,7 +66,7 @@ AppDynamics extension to pull data from ThousandEyes tests and import them into 
       ```
         chmod 700 createSchema.sh
         ./createSchema.sh -h 
-        #Example: ./createSchema.sh -sc TE -ac global_account_hehg1h2b3jh5b4324n2nfs -k kkkkk-aaaaa-xxxxx-yyyyy -es "https://fra-ana-api.saas.appdynamics.com" -port          443
+        #Example: ./createSchema.sh -sc TE -ac global_account_hehg1h2b3jh5b4324n2nfs -k kkkkk-aaaaa-xxxxx-yyyyy -es "https://fra-ana-api.saas.appdynamics.com" -port 443
       ```
     - Change the frequency under monitor.xml
     - Restart the machine agent
