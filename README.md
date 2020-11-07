@@ -3,9 +3,12 @@ AppDynamics extension to pull data from ThousandEyes tests and import them into 
 
 ###### Installation
 
--Centos
-  -Install and Configure the AppDynamics MachineAgent
-  -Navigate to the machine agent directory under monitors
-  1. machine-agent
-   - monitors
+1. Centos
+    - Install and Configure the AppDynamics MachineAgent
+    - Navigate to the machine agent directory under monitors
+    - Clone the github repository
+    ```
+      git clone https://github.com/nikpapage/ThousandEyes.git
+    ```
+  
  
