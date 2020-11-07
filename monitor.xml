@@ -1,0 +1,21 @@
+<monitor>
+    <name>ThousandEyes</name>
+    <type>managed</type>
+    <enabled>true</enabled>
+    <description>AppDynamics Thousand Eyes Integration</description>
+    <monitor-configuration>
+    </monitor-configuration>
+    <monitor-run-task>
+        <type>executable</type>
+        <name>run</name>
+        <task-arguments>
+        </task-arguments>
+        <execution-style>periodic</execution-style>
+        <execution-frequency-in-seconds>120</execution-frequency-in-seconds>
+        <execution-timeout-in-secs>120</execution-timeout-in-secs>
+        <executable-task>
+          <type>file</type>
+          <file>appdte.sh</file>
+        </executable-task>
+   </monitor-run-task>
+</monitor>

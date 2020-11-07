@@ -1,0 +1,49 @@
+ThousandEyes:
+  Test:
+    enabled: "integer"
+    testId: "integer"
+    testName: "string"
+    interval: "integer"
+    createdDate: "date"
+    type: "string"
+    protocol: "string"
+    createdBy: "string"
+    apiLinks: "string"
+  Metrics:
+    avgLatency: "float"
+    loss: "float"
+    maxLatency: "float"
+    jitter: "float"
+    minLatency: "float"
+    serverIp: "string"
+    agentName: "string"
+    countryId: "string"
+    date: "date"
+    agentId: "integer"
+    roundId: "integer"
+    permalink: "string"
+  TEConfig:
+    teAPI: "https://api.thousandeyes.com/v6/net/metrics/"
+    #Table of comma separated values for the test ids that will be added to the extension
+    #Single value example [123456]
+    #Multiple values example [123456, 123457]
+    tetestId: []
+    #Thousand Eyes user name
+    #Value should be within double quotes
+    teUsername: ""
+    #Thousand Eyes API Key, can be found under user's profile
+    #Value should be within double quotes
+    teKey: ""
+  AppDynamics:
+    #Events Service endpoint in the format of protocol:uri:port example https://fra-ana-api.saas.appdynamics.com:443
+    #Value should be within double quotes
+    appdEventsService: ""
+    #AppDynamics Analytics API key, this can be created under Analytics -> Configuration
+    #Value should be within double quotes
+    analyticsApiKey: ""
+    #AppDynamics global account name 
+    #Value should be within double quotes
+    globalAccountName: ""
+    #AppDynamics custom schema name
+    #Value should be within double quotes
+    schemaName: ""
