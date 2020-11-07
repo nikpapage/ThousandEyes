@@ -10,5 +10,24 @@ AppDynamics extension to pull data from ThousandEyes tests and import them into 
     ```
       git clone https://github.com/nikpapage/ThousandEyes.git
     ```
-  
- 
+    - Navigate to the Extension's directory
+    ```
+      cd ThousandEyes
+    ```
+    - Provide the correct permissions to the executable files
+     ```
+      chmod 700 appdte.sh 
+      chmod 700 appdte.py
+     ```
+    - Run the bash Script (Centos has a preinstall version of python and therefore there should'nt be any further changes)
+      ```
+        ./appdte.sh
+      ```
+    - The First time the code runs creates a script for the AppDynamics analytics schema creation. If needed run this adding the appropriate flags.
+      ```
+        chmod 700 createSchema.sh
+        ./createSchema.sh -h 
+        #Example: ./createSchema.sh -sc TE -ac global_account_hehg1h2b3jh5b4324n2nfs -k kkkkk-aaaaa-xxxxx-yyyyy -es "https://fra-ana-api.saas.appdynamics.com" -port          443
+      ```
+    - Change the frequency under monitor.xml
+    - Restart the machine agent
