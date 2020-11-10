@@ -85,6 +85,7 @@ te_config=[]
 appd_config=[]
 testIds=[]
 
+
 try:
   print("Opening configuration file from "+os.getcwd())
   with open('te_appd.yml') as f:
@@ -109,6 +110,8 @@ except:
 username=te_config['teUsername']
 api_key=te_config['teKey']
 te_api=te_config['teAPI']
+account_group=te_config['teAccountGroup']
+print("Setting account group: "+account_group)
 authentication=username+":"+api_key
 authstr= 'Basic '+  base64.b64encode(authentication.encode('utf-8')).decode('utf-8')
 
@@ -126,8 +129,62 @@ def get_thousandeyes_accountid():
   response=requests.request('GET',accounts_url,headers=headers)
   accounts=response.json()['accountGroups']
   for account in accounts:
-    if account['accountGroupName'] == te_config['teAccountGroup']:
+    if account['accountGroupName'] == account_group:
       return account['aid']
+
+
+
+
+def get_appdynamics_schema():
+  events_service_url = appd_config['appdEventsService']
+  schema_name = appd_config['schemaName']
+  retrieve_schema_url = events_service_url + "/events/schema/" + schema_name
+  print(retrieve_schema_url)
+  api_key = appd_config['analyticsApiKey']
+  account_name = appd_config['globalAccountName']
+  headers = {
+    'X-Events-API-AccountName': account_name,
+    'X-Events-API-Key': api_key,
+    'Content-type': 'application/vnd.appd.events+json;v=2'
+  }
+  schema={}
+  try:
+    response = requests.request("GET",retrieve_schema_url,headers=headers)
+    schema=response.json()
+  except requests.exceptions.RequestException as e:  # This is the correct syntax
+    print(e)
+    raise SystemExit(e)
+  return schema
+
+
+def update_appdynamics_schema():
+  schema_old=get_appdynamics_schema()['schema']
+  set_1 = set(schema_old.items())
+  set_2 = set(schema_dict.items())
+  difference=dict(set_2 - set_1)
+  if(difference):
+    diff_payload={}
+    diff_payload.update({'add' : difference})
+    events_service_url = appd_config['appdEventsService']
+    schema_name = appd_config['schemaName']
+    events_service_url = events_service_url + "/events/schema/" + schema_name
+    api_key = appd_config['analyticsApiKey']
+    account_name = appd_config['globalAccountName']
+    headers = {
+      'X-Events-API-AccountName': account_name,
+      'X-Events-API-Key': api_key,
+      'Content-type': 'application/vnd.appd.events+json;v=2',
+      'Accept-type': 'Accept: application/vnd.appd.events+json;v=2'
+    }
+    payload = "[" + json.dumps(diff_payload)+ "]"
+    try:
+      response = requests.patch( events_service_url, headers=headers, data=payload)
+      print(response.status_code)
+
+    except requests.exceptions.RequestException as e:  # This is the correct syntax
+      print(e)
+      raise SystemExit(e)
+
 
 
 def post_appdynamics_data(data):
@@ -150,6 +207,9 @@ def post_appdynamics_data(data):
     print(e)
     raise SystemExit(e)
 
+update_appdynamics_schema()
+
+
 
 for test_id in test_ids:
   print("PullingThousand Eyes data for testid: "+str(test_id))
@@ -166,7 +226,6 @@ for test_id in test_ids:
   te_params={}
   try:
     if(te_config['teAccountGroup']):
-      print(te_config['teAccountGroup'])
       te_params.update({'aid' : get_thousandeyes_accountid()})
   except:
     pass
@@ -180,38 +239,44 @@ for test_id in test_ids:
 
 
   test_dictionary={}
-  for test_field in test_fields:
-    test_value=test_json['net']['test'][test_field]
-    if 'date' in test_field:
-      time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
-      time_epoch = time.mktime(time_tuple)*1000
-      test_dictionary[test_field]= int(time_epoch)
-    elif 'Date' in test_field:
-      time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
-      time_epoch = time.mktime(time_tuple)*1000
-      test_dictionary[test_field]= int(time_epoch)
-    elif 'apiLinks' in test_field:
-      test_dictionary[test_field] = test_value[0]['href']
-    else:
-      test_dictionary[test_field] = test_value
+  test_keys=test_json['net']['test'].keys()
+  for test_field in test_keys:
+    if(test_field in schema_dict):
+      test_value=test_json['net']['test'][test_field]
+      if 'date' in test_field:
+        time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
+        time_epoch = time.mktime(time_tuple)*1000
+        test_dictionary[test_field]= int(time_epoch)
+      elif 'Date' in test_field:
+        time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
+        time_epoch = time.mktime(time_tuple)*1000
+        test_dictionary[test_field]= int(time_epoch)
+      elif 'apiLinks' in test_field:
+        test_dictionary[test_field] = test_value[0]['href']
+      else:
+        test_dictionary[test_field] = test_value
+
+
 
   for agent in test_json['net']['metrics']:
+    metrics_keys=agent.keys()
     metric_dictionary={}
-    for metric_field in metric_fields:
-      metric_value = agent[metric_field]
-      if 'date' in metric_field:
-        time_tuple = time.strptime(metric_value, '%Y-%m-%d %H:%M:%S')
-        time_epoch = time.mktime(time_tuple)*1000
-        metric_dictionary[metric_field] = int(time_epoch)
-      elif 'createdDate' in metric_field:
-        time_tuple = time.strptime(metric_value, '%Y-%m-%d %H:%M:%S')
-        time_epoch = time.mktime(time_tuple)*1000
-        metric_dictionary[metric_field] = int(time_epoch)
-      else:
-        metric_dictionary[metric_field] = metric_value
-    appd_dictionary={}
-    appd_dictionary.update(test_dictionary)
-    appd_dictionary.update(metric_dictionary)
+    for metric_field in metrics_keys:
+      if(metric_field in schema_dict):
+        metric_value = agent[metric_field]
+        if 'date' in metric_field:
+          time_tuple = time.strptime(metric_value, '%Y-%m-%d %H:%M:%S')
+          time_epoch = time.mktime(time_tuple)*1000
+          metric_dictionary[metric_field] = int(time_epoch)
+        elif 'createdDate' in metric_field:
+          time_tuple = time.strptime(metric_value, '%Y-%m-%d %H:%M:%S')
+          time_epoch = time.mktime(time_tuple)*1000
+          metric_dictionary[metric_field] = int(time_epoch)
+        else:
+          metric_dictionary[metric_field] = metric_value
+      appd_dictionary={}
+      appd_dictionary.update(test_dictionary)
+      appd_dictionary.update(metric_dictionary)
     print("Posting Thousand Eyes data into custom schema for test: "+str(test_id)+" and agent: "+metric_dictionary['agentName'])
     post_appdynamics_data(appd_dictionary)
 
