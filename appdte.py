@@ -277,6 +277,6 @@ for test_id in test_ids:
       appd_dictionary={}
       appd_dictionary.update(test_dictionary)
       appd_dictionary.update(metric_dictionary)
-    print("Posting Thousand Eyes data into custom schema for test: "+str(test_id)+" and agent: "+metric_dictionary['agentName'])
+    print("Posting Thousand Eyes data into custom schema for test: "+str(test_id)+" and agent: "+str(metric_dictionary['agentId']))
     post_appdynamics_data(appd_dictionary)
 
