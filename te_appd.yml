@@ -34,6 +34,9 @@ ThousandEyes:
     #Thousand Eyes API Key, can be found under user's profile
     #Value should be within double quotes
     teKey: ""
+    #Thousand Eyes Account Group
+    #Uncommend if there are more than one account groups for account
+    #teAccountGroup: ""
   AppDynamics:
     #Events Service endpoint in the format of protocol:uri:port example https://fra-ana-api.saas.appdynamics.com:443
     #Value should be within double quotes
