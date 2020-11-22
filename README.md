@@ -1,6 +1,15 @@
 # AppDynamics & ThousandEyes Integration
 AppDynamics extension to pull data from ThousandEyes tests and import them into AppDynamics using the APIs
 
+###### Metric Types
+The extension pulls the APIs below for metrics
+```
+net/metrics/
+web/page-load/
+web/http-server/
+```
+
+
 ###### Installation
 
 1. Centos
