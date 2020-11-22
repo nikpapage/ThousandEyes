@@ -23,7 +23,7 @@ ThousandEyes:
     roundId: "integer"
     permalink: "string"
   TEConfig:
-    teAPI: "https://api.thousandeyes.com/v6/net/metrics/"
+    teAPI: "https://api.thousandeyes.com/v6/"
     #Table of comma separated values for the test ids that will be added to the extension
     #Single value example [123456]
     #Multiple values example [123456, 123457]
