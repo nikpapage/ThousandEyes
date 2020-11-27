@@ -5,7 +5,7 @@
 # Created Date:     6 November 2020
 # Purpose:          AppDynamics & Integration Script using both AppD and TE APIs
 # Prerequisites:    Compatible with python3 and python2, requires requests and pyyaml packages
-# Change history:   0.1 - Initial version
+# Change history:   0.2 - Added Logging, Added the ability to use parameters
 #
 # THE SCRIPT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
@@ -14,21 +14,63 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THIS SCRIPT OR THE USE OR OTHER DEALINGS IN THE SCRIPT.
 # **********************************************************************
-
-
+import errno
 import requests
-import base64
 import json
+import getopt
 import yaml
 from datetime import date
 import time
 import os
+import logging
+import sys
+from requests.auth import HTTPBasicAuth
 
-print("Started AppDynamics & Thousand Eyes Extension")
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+logging.basicConfig(filename='logs/appd_te.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+
+config_file='te_appd.yml'
+log_level=logging.INFO
+
+# Get full command-line arguments
+full_cmd_arguments = sys.argv
+
+# Keep all but the first
+argument_list = full_cmd_arguments[1:]
+short_options = "hc:v"
+long_options = ["help", "config=", "verbose"]
+try:
+    arguments, values = getopt.getopt(argument_list, short_options, long_options)
+except getopt.error as err:
+    # Output error, and return with an error code
+    logging.error(str(err))
+    pass
+for current_argument, current_value in arguments:
+    if current_argument in ("-v", "--verbose"):
+        logging.info("Setting log level to DEBUG")
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+        logging.basicConfig(filename='logs/appd_te.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+    elif current_argument in ("-h", "--help"):
+        print ("Displaying help")
+    elif current_argument in ("-c", "--config"):
+        config_file=current_value
+        logging.info("Config file location changed to "+config_file)
+
+
+logging.info("Started AppDynamics & Thousand Eyes Extension")
+test_fields = []
+metric_fields = []
+te_config = []
+appd_config = []
+testIds = []
+# Create Client
+client = requests.session()
 
 def appdynamics_create_schema(schema):
-    print("Creating Script for Analytics Schema Creation......")
+    logging.info("Creating Script for Analytics Schema Creation......")
     command = "curl -X POST \"${events_service}:${port}/events/schema/$schemaName\" -H\"X-Events-API-AccountName:${accountName}\" -H\"X-Events-API-Key:${apiKey}\" -H\"Content-type: application/vnd.appd.events+json;v=2\" -d '{\"schema\":" + json.dumps(
         schema) + "}'"
     with open('createSchema.sh', 'w') as rsh:
@@ -79,20 +121,18 @@ def appdynamics_create_schema(schema):
     ''')
         rsh.write(command)
         rsh.close()
+        logging.info("Custom schema creation has been created. Please navigate to: "+os.getcwd())
+        logging.info("Change permissions to createSchema.sh chmod +x createSchema.sh")
+        logging.info("execute createSchema.sh in order to create the AppDynamics Analytics schema")
+        sys.exit()
 
 
-# Dynamically load attributes to be reported into AppD
-test_fields = []
-metric_fields = []
-te_config = []
-appd_config = []
-testIds = []
 
 try:
-    print("Opening configuration file from " + os.getcwd())
-    with open('te_appd.yml') as f:
+    logging.info("Opening configuration file " + config_file)
+    with open(config_file) as f:
         data = yaml.safe_load(f)
-
+        logging.debug("Full Config Loaded from file: "+str(data))
         # Create the schema creation command
         schema_dict = {}
         schema_dict.update(data['ThousandEyes']['Test'])
@@ -106,33 +146,45 @@ try:
         te_config = data['ThousandEyes']['TEConfig']
         test_ids = te_config['tetestId']
         appd_config = data['ThousandEyes']['AppDynamics']
-except:
-    print ("Failed to parse te_appd.yml in the following directory " + os.getcwd())
+except Exception as err:
+    logging.error("Failed to parse te_appd.yml in the following directory " + os.getcwd())
+    logging.error(err)
+
 
 username = te_config['teUsername']
+logging.debug("Setting thousand eyes username = "+username)
 api_key = te_config['teKey']
+logging.debug("Setting thousand eyes api_key = "+api_key)
 te_api = te_config['teAPI']
+logging.debug("Setting thousand eyes API URL = "+te_api)
 account_group = te_config['teAccountGroup']
-print("Setting account group: " + account_group)
-authentication = username + ":" + api_key
-authstr = 'Basic ' + base64.b64encode(authentication.encode('utf-8')).decode('utf-8')
+logging.debug("Setting thousand eyes Account Group = "+account_group)
+logging.debug("Setting authentication to username + API key")
+te_auth_user=HTTPBasicAuth(username,api_key)
 
-# Create Client
-client = requests.session()
+
 
 
 def get_thousandeyes_accountid():
+    logging.info("Extracting the account-group for user")
     accounts_url = te_api + "account-groups"
     headers = {
-        'Authorization': authstr,
         'accept': 'application/json',
         'content-type': 'application/json'
     }
-    response = requests.request('GET', accounts_url, headers=headers)
-    accounts = response.json()['accountGroups']
-    for account in accounts:
-        if account['accountGroupName'] == account_group:
-            return account['aid']
+    cafile="/Users/npapageo/development/ThousandEyes/npm/thousandeyes.pem"
+
+    response = requests.request('GET', accounts_url, headers=headers, auth=te_auth_user)
+    if(response.status_code>299):
+        logging.warning("Failed to extract account groups for thousand eyes username")
+        logging.debug("Failed to extract thousandeyes account group using url "+accounts_url +" and authentication user "+username)
+    try:
+        accounts = response.json()['accountGroups']
+        for account in accounts:
+            if account['accountGroupName'] == account_group:
+                return account['aid']
+    except(KeyError):
+        logging.error(KeyError)
 
 
 def get_appdynamics_schema():
@@ -150,14 +202,24 @@ def get_appdynamics_schema():
     try:
         response = requests.request("GET", retrieve_schema_url, headers=headers)
         schema = response.json()
+        if(response.status_code==404):
+            logging.error("Cannot retrieve Analytics Schema")
+            logging.error("Run createSchema.sh and validate the schema has been created in AppDynamics")
     except requests.exceptions.RequestException as e:  # This is the correct syntax
-        print(e)
+        logging.error("Failed to collect information on the AppDynamics analytics schema")
+        logging.error(e)
         raise SystemExit(e)
     return schema
 
 
 def update_appdynamics_schema():
-    schema_old = get_appdynamics_schema()['schema']
+    schema_old={}
+    try:
+        schema_old = get_appdynamics_schema()['schema']
+    except(KeyError):
+        logging.error("Cannot retrieve Analytics Schema")
+        logging.error("Run createSchema.sh and validate the schema has been created in AppDynamics")
+        sys.exit()
     set_1 = set(schema_old.items())
     set_2 = set(schema_dict.items())
     difference = dict(set_2 - set_1)
@@ -177,11 +239,11 @@ def update_appdynamics_schema():
         }
         payload = "[" + json.dumps(diff_payload) + "]"
         try:
+            logging.info("Updating custom schema fields: " + payload)
             response = requests.patch(events_service_url, headers=headers, data=payload)
-            print(response.status_code)
-
         except requests.exceptions.RequestException as e:  # This is the correct syntax
-            print(e)
+            logging.error("Failed to update Appdynamics Custom Schema")
+            logging.error(e.message)
             raise SystemExit(e)
 
 
@@ -200,9 +262,15 @@ def post_appdynamics_data(data):
     schema = json.dumps(data)
     schema = "[" + schema + "]"
     try:
+        logging.info("Pushing data into AppDynamics schema")
+        logging.debug("Pushing data into AppDynamics schema: "+schema)
         response = requests.request("POST", events_service_url, headers=headers, data=schema)
+        if(response.status_code>204):
+            logging.warning("POST data to AppDynamics failed with code: "+response.status_code)
+            logging.debug("POST data to AppDynamics failed with response: "+response.text)
     except requests.exceptions.RequestException as e:  # This is the correct syntax
-        print(e)
+        logging.error("Failed to POST data to the AppDynamics analytics schema")
+        logging.error(e)
         raise SystemExit(e)
 
 
@@ -210,11 +278,10 @@ update_appdynamics_schema()
 
 
 def get_metrics_and_update(url):
-    authstr = 'Basic ' + base64.b64encode(authentication.encode('utf-8')).decode('utf-8')
+    logging.debug("Pulling metrics from thousand eyes API: "+url)
     payload = {}
     metrics = {}
     headers = {
-        'Authorization': authstr,
         'content-type': 'application/json',
         'accept': 'application/json'
     }
@@ -225,25 +292,27 @@ def get_metrics_and_update(url):
     try:
         if (te_config['teAccountGroup']):
             te_params.update({'aid': get_thousandeyes_accountid()})
-    except:
+    except(KeyError):
+        logging.warning(KeyError)
         pass
     try:
-        response = requests.request("GET", url, headers=headers) if params is None else requests.request("GET",
+        response = requests.request("GET", url, headers=headers,auth=te_auth_user) if params is None else requests.request("GET",
                                                                                                                 url,
                                                                                                                 headers=headers,
-                                                                                                                params=te_params)
+                                                                                                                params=te_params, auth=te_auth_user)
+        if(response.status_code>299):
+            logging.warning("Pulling test metrics from thousand eyes failed with error code "+response.status_code)
+
         test_json = response.json()
     except requests.exceptions.RequestException as e:  # This is the correct syntax
-        print(e)
+        logging.error(e)
         raise SystemExit(e)
     return test_json
 
 
 def get_test_details(url):
-    authstr = 'Basic ' + base64.b64encode(authentication.encode('utf-8')).decode('utf-8')
     payload = {}
     headers = {
-        'Authorization': authstr,
         'content-type': 'application/json',
         'accept': 'application/json'
     }
@@ -257,10 +326,10 @@ def get_test_details(url):
     except:
         pass
     try:
-        response = requests.request("GET", te_api_url, headers=headers) if params is None else requests.request("GET",
+        response = requests.request("GET", te_api_url, headers=headers, auth=te_auth_user) if params is None else requests.request("GET",
                                                                                                                 te_api_url,
                                                                                                                 headers=headers,
-                                                                                                                params=te_params)
+                                                                                                                params=te_params,auth=te_auth_user)
         test_json = response.json()
     except requests.exceptions.RequestException as e:  # This is the correct syntax
         print(e)
@@ -271,33 +340,34 @@ def get_test_details(url):
 test_dictionary = {}
 apis = {'net/metrics/', 'net/bgp-metrics/'}
 for test_id in test_ids:
-    print("PullingThousand Eyes data for testid: " + str(test_id))
+    logging.info("PullingThousand Eyes data for testid: " + str(test_id))
     te_api_url = te_api + 'net/metrics/' + str(test_id) + ".json"
     test_info = get_test_details(te_api_url)
-    test_type = test_info['type']
     test_keys = test_info.keys()
-    for test_field in test_keys:
-        if (test_field in schema_dict):
-            test_value = test_info[test_field]
-            if 'date' in test_field:
-                time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
-                time_epoch = time.mktime(time_tuple) * 1000
-                test_dictionary[test_field] = int(time_epoch)
-            elif 'Date' in test_field:
-                time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
-                time_epoch = time.mktime(time_tuple) * 1000
-                test_dictionary[test_field] = int(time_epoch)
-            elif 'apiLinks' in test_field:
-                test_dictionary[test_field] = test_value[0]['href']
-            else:
-                test_dictionary[test_field] = test_value
+    try:
+        for test_field in test_keys:
+            if (test_field in schema_dict):
+                test_value = test_info[test_field]
+                if 'date' in test_field:
+                    time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
+                    time_epoch = time.mktime(time_tuple) * 1000
+                    test_dictionary[test_field] = int(time_epoch)
+                elif 'Date' in test_field:
+                    time_tuple = time.strptime(test_value, '%Y-%m-%d %H:%M:%S')
+                    time_epoch = time.mktime(time_tuple) * 1000
+                    test_dictionary[test_field] = int(time_epoch)
+                elif 'apiLinks' in test_field:
+                    test_dictionary[test_field] = test_value[0]['href']
+                else:
+                    test_dictionary[test_field] = test_value
+    except:
+        logging.warning("Failed to collect test metrics")
 
 
     metric_api_url = te_api + 'net/metrics/'  + str(test_id) + ".json"
     bgp_metrics_api_url= te_api + 'net/bgp-metrics/'  + str(test_id) + ".json"
     page_load_api_url=te_api + 'web/page-load/'  + str(test_id) + ".json"
     http_server_api_url=te_api  + 'web/http-server/'  + str(test_id) + ".json"
-    #path_vis_api_url=te_api  + '/net/path-vis/'  + str(test_id) + ".json"
 
     test_metrics = get_metrics_and_update(metric_api_url)['net']
     test_bgp_metrics={}
@@ -305,21 +375,21 @@ for test_id in test_ids:
     test_http_metrics={}
 
     try:
-      test_bgp_metrics= get_metrics_and_update(bgp_metrics_api_url)['net']['bgpMetrics']
+        test_bgp_metrics= get_metrics_and_update(bgp_metrics_api_url)['net']['bgpMetrics']
     except:
-      pass
+        logging.debug("Test does not contain bgpMetrics metrics or request failed: " + bgp_metrics_api_url)
+        pass
 
     try:
-      test_http_metrics= get_metrics_and_update(http_server_api_url)['web']['httpServer']
+        test_http_metrics= get_metrics_and_update(http_server_api_url)['web']['httpServer']
     except:
-      pass
+        logging.debug("Test does not contain httpServer metrics or request failed: "+http_server_api_url)
+        pass
     try:
-      test_page_load_metrics=get_metrics_and_update(page_load_api_url)['web']['pageLoad']
+        test_page_load_metrics=get_metrics_and_update(page_load_api_url)['web']['pageLoad']
     except:
-      pass
-    #test_http_server_metrics=get_metrics_and_update(http_server_api_url)
-    #test_path_vis_metrics=get_metrics_and_update(path_vis_api_url)
-
+        logging.debug("Test does not contain httpServer metrics or request failed: " + http_server_api_url)
+        pass
 
 
     for agent in test_metrics['metrics']:
@@ -352,5 +422,8 @@ for test_id in test_ids:
             appd_dictionary = {}
             appd_dictionary.update(test_dictionary)
             appd_dictionary.update(metric_dictionary)
-        print("Posting Thousand Eyes data into custom schema for test: " + str(test_id) + " and agent: " + str(metric_dictionary['agentId']))
+        logging.info("Posting Thousand Eyes data into custom schema for test: " + str(test_id) + " and agent: " + str(metric_dictionary['agentId']))
+        logging.debug("Posting Data in AppDynamics schema: "+str(metric_dictionary))
         post_appdynamics_data(appd_dictionary)
+
+
