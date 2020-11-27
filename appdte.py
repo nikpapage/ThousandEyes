@@ -146,6 +146,7 @@ try:
         te_config = data['ThousandEyes']['TEConfig']
         test_ids = te_config['tetestId']
         appd_config = data['ThousandEyes']['AppDynamics']
+        tls_certificate= data['ThousandEyes']['TLSCertificate']
 except Exception as err:
     logging.error("Failed to parse te_appd.yml in the following directory " + os.getcwd())
     logging.error(err)
@@ -164,6 +165,17 @@ te_auth_user=HTTPBasicAuth(username,api_key)
 
 
 
+def get_verification(tls_certificate):
+    if(tls_certificate):
+        logging.info("Certificate has been changed using configuration yaml")
+        logging.debug("New certificate path is "+ str(tls_certificate['certificateBundlePath']))
+        return tls_certificate['certificateBundlePath']
+    else:
+        logging.info("Certificate has not been set defaults to verification False")
+        return False
+
+
+certificate_bundle=get_verification(tls_certificate)
 
 def get_thousandeyes_accountid():
     logging.info("Extracting the account-group for user")
@@ -174,7 +186,7 @@ def get_thousandeyes_accountid():
     }
     cafile="/Users/npapageo/development/ThousandEyes/npm/thousandeyes.pem"
 
-    response = requests.request('GET', accounts_url, headers=headers, auth=te_auth_user)
+    response = requests.request('GET', accounts_url, headers=headers, auth=te_auth_user, verify=certificate_bundle)
     if(response.status_code>299):
         logging.warning("Failed to extract account groups for thousand eyes username")
         logging.debug("Failed to extract thousandeyes account group using url "+accounts_url +" and authentication user "+username)
@@ -200,7 +212,7 @@ def get_appdynamics_schema():
     }
     schema = {}
     try:
-        response = requests.request("GET", retrieve_schema_url, headers=headers)
+        response = requests.request("GET", retrieve_schema_url, headers=headers, verify=certificate_bundle)
         schema = response.json()
         if(response.status_code==404):
             logging.error("Cannot retrieve Analytics Schema")
@@ -240,7 +252,7 @@ def update_appdynamics_schema():
         payload = "[" + json.dumps(diff_payload) + "]"
         try:
             logging.info("Updating custom schema fields: " + payload)
-            response = requests.patch(events_service_url, headers=headers, data=payload)
+            response = requests.patch(events_service_url, headers=headers, data=payload , verify=certificate_bundle)
         except requests.exceptions.RequestException as e:  # This is the correct syntax
             logging.error("Failed to update Appdynamics Custom Schema")
             logging.error(e.message)
@@ -264,7 +276,7 @@ def post_appdynamics_data(data):
     try:
         logging.info("Pushing data into AppDynamics schema")
         logging.debug("Pushing data into AppDynamics schema: "+schema)
-        response = requests.request("POST", events_service_url, headers=headers, data=schema)
+        response = requests.request("POST", events_service_url, headers=headers, data=schema , verify=certificate_bundle)
         if(response.status_code>204):
             logging.warning("POST data to AppDynamics failed with code: "+response.status_code)
             logging.debug("POST data to AppDynamics failed with response: "+response.text)
@@ -296,10 +308,10 @@ def get_metrics_and_update(url):
         logging.warning(KeyError)
         pass
     try:
-        response = requests.request("GET", url, headers=headers,auth=te_auth_user) if params is None else requests.request("GET",
+        response = requests.request("GET", url, headers=headers,auth=te_auth_user, verify=certificate_bundle) if params is None else requests.request("GET",
                                                                                                                 url,
                                                                                                                 headers=headers,
-                                                                                                                params=te_params, auth=te_auth_user)
+                                                                                                                params=te_params, auth=te_auth_user, verify=certificate_bundle)
         if(response.status_code>299):
             logging.warning("Pulling test metrics from thousand eyes failed with error code "+response.status_code)
 
@@ -326,10 +338,10 @@ def get_test_details(url):
     except:
         pass
     try:
-        response = requests.request("GET", te_api_url, headers=headers, auth=te_auth_user) if params is None else requests.request("GET",
+        response = requests.request("GET", te_api_url, headers=headers, auth=te_auth_user, verify=certificate_bundle) if params is None else requests.request("GET",
                                                                                                                 te_api_url,
                                                                                                                 headers=headers,
-                                                                                                                params=te_params,auth=te_auth_user)
+                                                                                                                params=te_params,auth=te_auth_user, verify=certificate_bundle)
         test_json = response.json()
     except requests.exceptions.RequestException as e:  # This is the correct syntax
         print(e)
@@ -399,12 +411,14 @@ for test_id in test_ids:
         for pageload in test_page_load_metrics:
           if (agent['agentId'] == pageload['agentId']):
             agent.update(pageload)
-            metrics_keys= metrics_keys+list(set(pageload.keys()) - set(metrics_keys))
+            metrics_keys = agent.keys()
+            #metrics_keys= metrics_keys+list(set(pageload.keys()) - set(metrics_keys))
 
         for httpServer in test_http_metrics:
           if (agent['agentId'] == httpServer['agentId']):
             agent.update(httpServer)
-            metrics_keys= metrics_keys+list(set(httpServer.keys()) - set(metrics_keys))
+            metrics_keys=agent.keys()
+            #metrics_keys= metrics_keys+list(set(httpServer.keys()) - set(metrics_keys))
 
         for metric_field in metrics_keys:
             if (metric_field in schema_dict):
@@ -425,5 +439,6 @@ for test_id in test_ids:
         logging.info("Posting Thousand Eyes data into custom schema for test: " + str(test_id) + " and agent: " + str(metric_dictionary['agentId']))
         logging.debug("Posting Data in AppDynamics schema: "+str(metric_dictionary))
         post_appdynamics_data(appd_dictionary)
+
 
 
