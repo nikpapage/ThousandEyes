@@ -79,3 +79,40 @@ web/http-server/
       ```
     - Change the frequency under monitor.xml
     - Restart the machine agent
+  
+  
+ Startup Options
+    - Changing the default configuration file location, modify appdte.sh 
+       ```
+       python appdte.py -c <config_file_location>
+       ```
+       or
+       ```
+       python appdte.py --config <config_file_location>
+         ```
+    - Changing the log level, 
+       ```
+       python appdte.py -v
+       ```
+       or
+       ```
+       python3 appdte.py --verbose
+       ```
+    - TLS CA Authority
+      The repository comes with a predefined ca-bundle file and configuration defaults to it. The ca-bundle is used to verify the ThousandEyes and AppDynamics         endpoints. The user has the ability to point the python script to a preexisting CA bundle or disable the Verification.     
+      
+      Default
+       ```
+        TLSCertificate:
+            certificateBundlePath: "certificates/appd-te.ca-bundle"
+       ```
+       Custom
+       ```
+        TLSCertificate:
+            certificateBundlePath: "<Path_to_CA_Bundle>"
+       ```
+       Verification Disabled
+       ```
+        TLSCertificate:
+            certificateBundlePath: ""
+       ```
