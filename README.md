@@ -99,18 +99,18 @@ web/http-server/
        python3 appdte.py --verbose
        ```
     - TLS CA Authority
-      The repository comes with a predefined ca-bundle file and configuration defaults to it. The ca-bundle is used to verify the ThousandEyes and AppDynamics         endpoints. The user has the ability to point the python script to a preexisting CA bundle or disable the Verification.     
-      Default
+      - The repository comes with a predefined ca-bundle file and configuration defaults to it. The ca-bundle is used to verify the ThousandEyes and AppDynamics         endpoints. The user has the ability to point the python script to a preexisting CA bundle or disable the Verification.     
+      - Default
        ```
         TLSCertificate:
             certificateBundlePath: "certificates/appd-te.ca-bundle"
        ```
-       Custom
+      - Custom
        ```
         TLSCertificate:
             certificateBundlePath: "<Path_to_CA_Bundle>"
        ```
-       Verification Disabled
+      - Verification Disabled
        ```
         TLSCertificate:
             certificateBundlePath: ""
