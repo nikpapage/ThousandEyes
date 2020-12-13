@@ -102,6 +102,12 @@ web/http-server/
        ```
        python3 appdte.py --verbose
        ```
+   - Complete Example
+       ```
+       python appdte.py -c '/home/ec2-user/te_appd.yml' --logPath '/home/ec2-user/appd_te.log' -v
+       ```
+       
+###### Certificates
   - TLS CA Authority
       The repository comes with a predefined ca-bundle file and configuration defaults to it. The ca-bundle is used to verify the ThousandEyes and AppDynamics         endpoints. The user has the ability to point the python script to a preexisting CA bundle or disable the Verification.     
       Default
