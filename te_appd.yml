@@ -1,4 +1,7 @@
 ThousandEyes:
+  Extension:
+    AccountGroup: "string"
+    extensionHost: "string"
   Test:
     enabled: "integer"
     testId: "integer"
@@ -50,5 +53,7 @@ ThousandEyes:
     #AppDynamics custom schema name
     #Value should be within double quotes
     schemaName: ""
+    #Hostname of the extension
+    hostname: ""
   TLSCertificate:
     certificateBundlePath: "certificates/appd-te.ca-bundle"
