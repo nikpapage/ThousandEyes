@@ -28,7 +28,7 @@ from requests.auth import HTTPBasicAuth
 
 if not os.path.exists('logs'):
     os.makedirs('logs')
-logging.basicConfig(filename='logs/appd_te.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+logging.basicConfig(filename='logs/appd_te.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 
 config_file='te_appd.yml'
