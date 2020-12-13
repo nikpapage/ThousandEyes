@@ -50,3 +50,5 @@ ThousandEyes:
     #AppDynamics custom schema name
     #Value should be within double quotes
     schemaName: ""
+  TLSCertificate:
+    certificateBundlePath: "certificates/appd-te.ca-bundle"
