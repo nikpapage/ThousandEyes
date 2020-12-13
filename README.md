@@ -90,6 +90,10 @@ web/http-server/
        ```
        python appdte.py --config <config_file_location>
          ```
+   - Changing the log path, 
+       ```
+       python appdte.py --logPath <path to log file>
+       ```
    - Changing the log level, 
        ```
        python appdte.py -v
