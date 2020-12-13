@@ -2,10 +2,10 @@
 # **********************************************************************
 # Script Name:      appdynamics_te.py
 # Author:           Nik Papageorgiou
-# Created Date:     6 November 2020
+# Created Date:     13 December 2020
 # Purpose:          AppDynamics & Integration Script using both AppD and TE APIs
 # Prerequisites:    Compatible with python3 and python2, requires requests and pyyaml packages
-# Change history:   0.2 - Added Logging, Added the ability to use parameters
+# Change history:   0.3 - Parameter Logging, Additional Default fields Account Group and Hostname
 #
 # THE SCRIPT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
 # INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
@@ -28,7 +28,7 @@ from requests.auth import HTTPBasicAuth
 
 if not os.path.exists('logs'):
     os.makedirs('logs')
-logging.basicConfig(filename='logs/appd_te.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(filename='logs/appd_te.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 
 config_file='te_appd.yml'
@@ -40,24 +40,46 @@ full_cmd_arguments = sys.argv
 # Keep all but the first
 argument_list = full_cmd_arguments[1:]
 short_options = "hc:v"
-long_options = ["help", "config=", "verbose"]
+long_options = ["help", "config=","logPath=", "verbose"]
 try:
     arguments, values = getopt.getopt(argument_list, short_options, long_options)
 except getopt.error as err:
     # Output error, and return with an error code
     logging.error(str(err))
     pass
+
+log_filename='logs/appd_te.log'
+log_level=logging.INFO
+
+
+for current_argument, current_value in arguments:
+    if current_argument in "--logPath":
+        logging.info("Setting log path to " + current_value)
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+
+        if not os.path.exists(os.path.dirname(current_value)):
+            try:
+                os.makedirs(os.path.dirname(current_value))
+            except OSError as exc:
+                print("Attempted to create log directory failed for dir "+str(os.path.dirname(current_value)))
+                print("Validate Permissions and reattempt")
+        log_filename = current_value
+        logging.basicConfig(filename=log_filename, format='%(asctime)s - %(levelname)s - %(message)s', level=log_level)
+        logging.info("Changed log location to " + log_filename)
+
 for current_argument, current_value in arguments:
     if current_argument in ("-v", "--verbose"):
         logging.info("Setting log level to DEBUG")
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
-        logging.basicConfig(filename='logs/appd_te.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+        logging.basicConfig(filename=log_filename, format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
     elif current_argument in ("-h", "--help"):
         print ("Displaying help")
     elif current_argument in ("-c", "--config"):
         config_file=current_value
         logging.info("Config file location changed to "+config_file)
+
 
 
 logging.info("Started AppDynamics & Thousand Eyes Extension")
@@ -66,6 +88,7 @@ metric_fields = []
 te_config = []
 appd_config = []
 testIds = []
+extension_schema={}
 # Create Client
 client = requests.session()
 
@@ -134,9 +157,22 @@ try:
         data = yaml.safe_load(f)
         logging.debug("Full Config Loaded from file: "+str(data))
         # Create the schema creation command
+        extension_dict={}
+        te_account_group=''
+        extension_host=''
+        try:
+            te_account_group=data['ThousandEyes']['TEConfig']['teAccountGroup']
+            extension_host=data['ThousandEyes']['AppDynamics']['hostname']
+        except Exception as error:
+            logging.warning("Failed to extract ThousandEyes id or hostname")
+        extension_schema.update({'AccountGroup': te_account_group} if te_account_group is not None else {})
+        extension_schema.update({'extensionHost': extension_host} if extension_host is not None else {})
+
         schema_dict = {}
+        schema_dict.update(data['ThousandEyes']['Extension'])
         schema_dict.update(data['ThousandEyes']['Test'])
         schema_dict.update(data['ThousandEyes']['Metrics'])
+
         if not os.path.exists("./createSchema.sh"):
             appdynamics_create_schema(schema_dict)
         for item in data['ThousandEyes']['Test']:
@@ -184,7 +220,6 @@ def get_thousandeyes_accountid():
         'accept': 'application/json',
         'content-type': 'application/json'
     }
-    cafile="/Users/npapageo/development/ThousandEyes/npm/thousandeyes.pem"
 
     response = requests.request('GET', accounts_url, headers=headers, auth=te_auth_user, verify=certificate_bundle)
     if(response.status_code>299):
@@ -278,7 +313,7 @@ def post_appdynamics_data(data):
         logging.debug("Pushing data into AppDynamics schema: "+schema)
         response = requests.request("POST", events_service_url, headers=headers, data=schema , verify=certificate_bundle)
         if(response.status_code>204):
-            logging.warning("POST data to AppDynamics failed with code: "+response.status_code)
+            logging.warning("POST data to AppDynamics failed with code: "+str(response.status_code))
             logging.debug("POST data to AppDynamics failed with response: "+response.text)
     except requests.exceptions.RequestException as e:  # This is the correct syntax
         logging.error("Failed to POST data to the AppDynamics analytics schema")
@@ -344,7 +379,6 @@ def get_test_details(url):
                                                                                                                 params=te_params,auth=te_auth_user, verify=certificate_bundle)
         test_json = response.json()
     except requests.exceptions.RequestException as e:  # This is the correct syntax
-        print(e)
         raise SystemExit(e)
     return test_json['net']['test']
 
@@ -436,6 +470,7 @@ for test_id in test_ids:
             appd_dictionary = {}
             appd_dictionary.update(test_dictionary)
             appd_dictionary.update(metric_dictionary)
+            appd_dictionary.update(extension_schema)
         logging.info("Posting Thousand Eyes data into custom schema for test: " + str(test_id) + " and agent: " + str(metric_dictionary['agentId']))
         logging.debug("Posting Data in AppDynamics schema: "+str(metric_dictionary))
         post_appdynamics_data(appd_dictionary)
