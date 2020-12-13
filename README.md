@@ -89,7 +89,7 @@ web/http-server/
        or
        ```
        python appdte.py --config <config_file_location>
-         ```
+       ```
    - Changing the log path, 
        ```
        python appdte.py --logPath <path to log file>
